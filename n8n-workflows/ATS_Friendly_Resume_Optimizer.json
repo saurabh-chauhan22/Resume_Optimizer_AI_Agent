@@ -1,0 +1,637 @@
+{
+  "name": "ATS-Friendly-Resume-Optimizer",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "resume-optimizer",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "3640f2ea-bd14-4c40-b4f0-8692c8232cf8",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -860,
+        100
+      ],
+      "webhookId": "10f517c1-a335-4de4-9ebd-0d986bc5487b"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition1",
+              "leftValue": "={{ $json.body.job_description || '' }}",
+              "rightValue": "system|prompt|injection|vulnerability|hack|exploit|override",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "535a27d0-693c-404a-8299-c25ff50f305f",
+      "name": "Security Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -640,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"response\": \"Sorry not possible\", \"status\": \"blocked\" } }}",
+        "options": {}
+      },
+      "id": "f50d1225-3059-4c13-8ae8-4c7d4e099f73",
+      "name": "Security Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -420,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"response\": $json.error, \"status\": \"error\", \"debug\": $json.debug } }}",
+        "options": {}
+      },
+      "id": "6603f33d-8ce0-4718-893c-2e2b96583755",
+      "name": "Validation Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        50
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract text from uploaded PDF file\nlet extractedText = $('Extract from File').first().json.text;\n\nif (extractedText == '') {\n  return {\n    error: 'No file data found',\n    hasError: true\n  };\n}\n\n// Handle different file types\nconst fileName = $('Extract from File').first().json.info.Title || 'Resume';\nconst fileExtension = 'pdf';\n\nconsole.log('Processing file:', fileName, 'Extension:', fileExtension);\n\ntry {\n  // Clean up common text extraction artifacts\n  extractedText = extractedText\n    .replace(/\\r\\n/g, '\\n')  // Normalize line endings\n    .replace(/\\r/g, '\\n')   // Handle old Mac line endings\n    .replace(/\\n{3,}/g, '\\n\\n')  // Remove excessive line breaks\n    .trim();\n\n  if (!extractedText || extractedText.length < 50) {\n    return {\n      error: 'Could not extract sufficient text from the uploaded file. Please ensure the file contains readable resume content.',\n      hasError: true,\n      debug: {\n        extractedLength: extractedText.length,\n        fileName: fileName,\n        fileExtension: fileExtension,\n        preview: extractedText.substring(0, 200)\n      }\n    };\n  }\n\n} catch (error) {\n  return {\n    error: `Failed to process uploaded file`,\n    hasError: true,\n    debug: {\n      fileName: fileName,\n      fileExtension: fileExtension,\n    }\n  };\n}\n\nreturn {\n  resumeText: extractedText,\n  jobDescription: $('Edit Fields').first().json.body.job_description,\n  userId: $('Edit Fields').first().json.body.user_id,\n  conversationId: $('Edit Fields').first().json.body.conversation_id,\n  fileName: fileName,\n  hasError: false\n};"
+      },
+      "id": "1ee67af3-5fab-42c1-9611-401b24dfd04d",
+      "name": "Extract File Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -200,
+        300
+      ],
+      "alwaysOutputData": false,
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "condition1",
+              "leftValue": "={{ $json.hasError }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e5302e85-164e-432f-89f5-52edf5c091c2",
+      "name": "File Extraction Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        20,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"response\": $json.error, \"status\": \"file_error\", \"debug\": $json.debug, \"supportedFormats\": $json.supportedFormats } }}",
+        "options": {}
+      },
+      "id": "ec723467-b86f-4198-9cc4-98b297f9a46e",
+      "name": "File Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        318,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "condition1",
+              "leftValue": "={{ $json.hasError }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "94252afb-c266-4cb5-a4b6-cd043fad4bb7",
+      "name": "Extraction Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        620,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"response\": $json.error, \"status\": \"extraction_error\" } }}",
+        "options": {}
+      },
+      "id": "25f1a9e9-d60d-42f5-b05d-3a9994f02156",
+      "name": "Extraction Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        914,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "schema": "public",
+        "table": "resume_conversations",
+        "dataMode": "defineBelow",
+        "valuesToSend": {
+          "values": [
+            {
+              "column": "user_id",
+              "value": "={{ $('Extract File Text').item.json.userId }}"
+            },
+            {
+              "column": "conversation_id",
+              "value": "={{ $('Extract File Text').item.json.conversationId }}"
+            },
+            {
+              "column": "message",
+              "value": "={{ $('Extract File Text').item.json.jobDescription }}"
+            },
+            {
+              "column": "ai_response",
+              "value": "={{ $('OpenAI1').item.json.message.content }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cf366ac1-0d97-46fd-97db-b4bd38837a92",
+      "name": "Store Conversation",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        1432,
+        500
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "nGHluYfE1V243Clg",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "=Optimize Resume : {{ $json.ai_response }}\n\nconversation_id : {{ $json.conversation_id }}\n\nstatus : Success",
+        "options": {}
+      },
+      "id": "5f0ca5aa-1347-4452-8439-950b945e0fed",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1652,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a50de517-b543-4e99-ae3d-484a6fc90374",
+              "name": "body",
+              "value": "={{ $json.body }}",
+              "type": "object"
+            },
+            {
+              "id": "e12adbbf-6a5a-41f3-9c54-a062d5cad36d",
+              "name": "headers",
+              "value": "={{ $json.headers }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -640,
+        100
+      ],
+      "id": "7a71a70e-fb00-4c30-a9c8-861180153a57",
+      "name": "Edit Fields",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "condition1",
+              "leftValue": "={{ $json.hasError }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f627eb74-db2e-4745-81a8-8cb502d9ba75",
+      "name": "Validation Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -420,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "resume",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -640,
+        350
+      ],
+      "id": "3057d170-1ea9-4f31-bd08-b93b99f5cf10",
+      "name": "Extract from File",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7146c226-1c1e-4004-96c8-b8565036d6cf",
+              "name": "text",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -420,
+        350
+      ],
+      "id": "d09ae962-c9e8-4a27-b474-3786ad5e9565",
+      "name": "Edit Fields1",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "You are a Resume Extraction Assistant. Your task is to parse raw resume text and convert it into a structured JSON format.\\n\\nExtract information according to this exact structure:\\n\\n1. contact_info:\\n   • name – Full name\\n   • email – Professional email address\\n   • phone – Mobile number (include country code if outside the US)\\n   • linkedin – LinkedIn profile URL (if provided)\\n   • github – GitHub URL (if provided)\\n   • website – Personal website or portfolio URL (if provided)\\n\\n2. professional_summary:\\n   • summary – 2–3 concise sentences highlighting top skills, years of experience, and core focus\\n\\n3. skills:\\n   • technical – List of technical skills (e.g., languages, frameworks, tools)\\n   • soft – List of soft skills (e.g., leadership, communication)\\n\\n4. experience:\\n   An array of job entries, each with:\\n   • title – Job title\\n   • company – Company name\\n   • location – City, State/Country\\n   • start_date – MMM YYYY (e.g., Jan 2021)\\n   • end_date – MMM YYYY or \\\"Present\\\"\\n   • responsibilities – Array of 2–5 bullet points, each describing a key achievement or responsibility, starting with a strong action verb\\n\\n5. education:\\n   An array of academic entries, each with:\\n   • degree – e.g., \\\"B.Sc. in Computer Science\\\"\\n   • institution – University or college name\\n   • location – City, State/Country\\n   • graduation_date – MMM YYYY\\n\\n6. certifications (optional):\\n   An array of certifications, each with:\\n   • name – Certification title\\n   • issuer – Issuing organization\\n   • date_earned – MMM YYYY\\n\\n7. projects (optional):\\n   An array of project entries, each with:\\n   • name – Project name\\n   • description – 1–2 sentence overview\\n   • technologies – List of tech used\\n   • link – URL (if available)\\n\\n8. additional_sections (optional):\\n   • languages – List of spoken languages + proficiency (e.g., \\\"Spanish (Professional)\\\")\\n   • awards – List of awards or honors\\n\\nInstructions:\\n- Parse the raw resume below and populate each field\\n- If a section is not present in the source, omit the field entirely\\n- Ensure dates use the MMM YYYY format\\n- Output ONLY valid JSON (no markdown, no comments)",
+              "role": "system"
+            },
+            {
+              "content": "=Resume text : {{ $json.resumeText }}\nJob Description : {{ $json.jobDescription }}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        240,
+        400
+      ],
+      "id": "8eb87a0f-6ab5-4f7f-a76d-46271b86345b",
+      "name": "OpenAI",
+      "credentials": {
+        "openAiApi": {
+          "id": "XLuUDJ6oy9cUeBYf",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "You are Resume Optimization Assistant, an AI-driven agent specialized in analyzing and optimizing resumes for specific job applications while maintaining high ATS (Applicant Tracking System) compatibility.\\n\\nYour primary objectives:\\n- Analyze the provided resume structure against the job description\\n- Identify sections that need improvement, content removal, or enhancement\\n- Provide specific, actionable recommendations for each resume section\\n- Ensure recommendations align with job requirements and maintain ATS compatibility of 90%+\\n- Focus on keyword optimization, relevance, and impact\\n\\nFor each section that needs optimization, provide:\\n- Specific improvements needed\\n- Content that should be removed or modified\\n- Suggestions for better bullet points or descriptions\\n- Keyword recommendations based on the job description\\n\\nOutput your analysis in JSON format with clear sections for improvements and removals.",
+              "role": "system"
+            },
+            {
+              "content": "=EXTRACTED RESUME of {{ $json.message.content.contact_info.name }} : \n\n------------------------------------------------------------------------------\nContact Info : {{ $json.message.content.contact_info }}\nProfessional Summary : {{ $json.message.content.professional_summary.summary }}\n\nTechnical skills: {{ $json.message.content.skills.technical }}\nSoft Skills : {{ $json.message.content.skills.soft }}\n\nExperience : {{ $json.message.content.experience }}\nEducation : {{ $json.message.content.education }}\n\nProjects : {{ $json.message.content.projects }}\n\nAdditional Sections : {{ $json.message.content.additional_sections }}\n\n-------------------------------------------------------------------------------\nJOB DESCRIPTION: {{ $('Extract File Text').item.json.jobDescription }}\n\n\n\\n\\nPlease provide optimization suggestions including:\\n1. Section-specific improvements needed\\n2. Content that should be removed or modified\\n3. Bullet points that need enhancement or removal\\n4. New content recommendations\\n5. Keyword optimization suggestions\\n6. ATS compatibility improvements\\n\\nStructure your response to clearly indicate what changes are needed for each resume section."
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        836,
+        500
+      ],
+      "id": "98cf762c-4e2b-4239-9414-c72aee41f0e9",
+      "name": "OpenAI1",
+      "credentials": {
+        "openAiApi": {
+          "id": "XLuUDJ6oy9cUeBYf",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "message.content",
+        "binaryPropertyName": "={{ $json.message.content }}",
+        "options": {
+          "fileName": "={{ $('OpenAI').item.json.message.content.contact_info.name }}{{ $('Extract File Text').item.json.userId }}"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1212,
+        500
+      ],
+      "id": "0f9610ca-21cd-4666-89bb-115e18679b7b",
+      "name": "Convert to File"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Security Check",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Security Check": {
+      "main": [
+        [
+          {
+            "node": "Security Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract File Text": {
+      "main": [
+        [
+          {
+            "node": "File Extraction Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "File Extraction Check": {
+      "main": [
+        [
+          {
+            "node": "File Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraction Check": {
+      "main": [
+        [
+          {
+            "node": "Extraction Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OpenAI1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Conversation": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Validation Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validation Check": {
+      "main": [
+        [
+          {
+            "node": "Validation Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract File Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Extract File Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Extraction Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI1": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Store Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "564c86dc-a195-49d7-99bf-92c4a2816310",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "62e426dbba3e7ce5b32a23a829c4dae608e49690c958b38023405430dbff24a1"
+  },
+  "id": "gEsC9gDsHKL8Jotg",
+  "tags": []
+}
